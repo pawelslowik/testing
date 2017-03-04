@@ -8,9 +8,9 @@ import org.springframework.stereotype.Component;
  * Created by psl on 03.03.17.
  */
 @Component
-public class Service {
+public class RequestProcessingService {
 
-    private static Logger LOGGER = LoggerFactory.getLogger(Service.class);
+    private static Logger LOGGER = LoggerFactory.getLogger(RequestProcessingService.class);
 
     public String processRequest(String request){
         LOGGER.info("Received request={}", request);

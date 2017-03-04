@@ -14,12 +14,12 @@ import static org.junit.Assert.assertEquals;
  * Created by psl on 03.03.17.
  */
 @ContextConfiguration(classes = TestConfig.class)
-public class TestSteps {
+public class RequestProcessingTestSteps {
 
-    private static Logger LOGGER = LoggerFactory.getLogger(TestSteps.class);
+    private static Logger LOGGER = LoggerFactory.getLogger(RequestProcessingTestSteps.class);
 
     @Autowired
-    private Service service;
+    private RequestProcessingService requestProcessingService;
     private String request;
     private String response;
 
@@ -29,9 +29,9 @@ public class TestSteps {
         this.request = request;
     }
 
-    @When("^the request is processed by Service$")
+    @When("^the request is processed by RequestProcessingService$")
     public void whenProcessed(){
-        response = service.processRequest(request);
+        response = requestProcessingService.processRequest(request);
         LOGGER.info("Got response={}", response);
     }
 
