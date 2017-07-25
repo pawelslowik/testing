@@ -6,4 +6,6 @@ package pl.com.psl.testing.mockito.order;
 public interface OrderEventPublisher {
 
     void publishOrderCreated(long id);
+
+    void publishOrderProcessed(long id);
 }

@@ -17,12 +17,14 @@ public class OrderService {
     private CustomerService customerService;
     private ItemService itemService;
     private OrderEventPublisher orderEventPublisher;
+    private OrderProcessor orderProcessor;
 
-    public OrderService(OrderRepository orderRepository, CustomerService customerService, ItemService itemService, OrderEventPublisher orderEventPublisher) {
+    public OrderService(OrderRepository orderRepository, CustomerService customerService, ItemService itemService, OrderEventPublisher orderEventPublisher, OrderProcessor orderProcessor) {
         this.orderRepository = orderRepository;
         this.customerService = customerService;
         this.itemService = itemService;
         this.orderEventPublisher = orderEventPublisher;
+        this.orderProcessor = orderProcessor;
     }
 
     public void createOrder(Customer customer, List<Item> items) throws OrderServiceException{
@@ -36,6 +38,33 @@ public class OrderService {
             throw new OrderServiceException("Failed to write order into order repository!", e);
         }
         orderEventPublisher.publishOrderCreated(order.getId());
+    }
+
+    public void saveOrder(Order order) throws OrderServiceException {
+        try {
+            orderRepository.write(order);
+        } catch (OrderRepository.OrderRepositoryException e) {
+            throw new OrderServiceException("Failed to write order into order repository!", e);
+        }
+    }
+
+    public Order getOrder(long id) throws OrderServiceException{
+        try {
+            return orderRepository.read(id);
+        } catch (OrderRepository.OrderRepositoryException e) {
+            throw new OrderServiceException("Failed to read order from order repository!", e);
+        }
+    }
+
+    public void processOrders(Order...orders) throws OrderServiceException {
+        for (Order order : orders) {
+            try {
+                orderProcessor.processOrder(order);
+                orderEventPublisher.publishOrderProcessed(order.getId());
+            } catch (OrderProcessor.OrderProcessorException e) {
+                throw new OrderServiceException("Failed to read process order!", e);
+            }
+        }
     }
 
     private void validateCustomer(Customer customer) throws OrderServiceException{

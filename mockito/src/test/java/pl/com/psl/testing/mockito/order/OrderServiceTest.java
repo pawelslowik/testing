@@ -5,6 +5,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.MockitoJUnitRunner;
 import pl.com.psl.testing.mockito.customer.Customer;
 import pl.com.psl.testing.mockito.customer.CustomerService;
@@ -14,7 +15,9 @@ import pl.com.psl.testing.mockito.item.ItemService;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Matchers.argThat;
 import static org.mockito.Mockito.*;
 
@@ -23,6 +26,7 @@ import static org.mockito.Mockito.*;
  */
 @RunWith(MockitoJUnitRunner.class)
 public class OrderServiceTest {
+
     private static final String SOME_ADDRESS = "some address";
     private static final String SOME_CUSTOMER_NAME = "some customer name";
     private static final long SOME_ORDER_ID = 1L;
@@ -46,6 +50,8 @@ public class OrderServiceTest {
     private ItemService itemService;
     @Mock
     private OrderEventPublisher orderEventPublisher;
+    @Mock
+    private OrderProcessor orderProcessor;
     @InjectMocks
     private OrderService orderService;
 
@@ -163,5 +169,65 @@ public class OrderServiceTest {
         when(orderRepository.write(argThat(order -> order.getCustomer() == customer && order.getItems() == items))).thenReturn(order);
         orderService.createOrder(customer, items);
         verify(orderEventPublisher, times(1)).publishOrderCreated(SOME_ORDER_ID);
+    }
+
+    @Test(expected = OrderService.OrderServiceException.class)
+    public void shouldThrowExceptionWhenCantReadFromOrderRepository() throws OrderRepository.OrderRepositoryException, OrderService.OrderServiceException {
+        when(orderRepository.read(SOME_ORDER_ID)).thenThrow(OrderRepository.OrderRepositoryException.class);
+        orderService.getOrder(SOME_ORDER_ID);
+    }
+
+    @Test
+    public void shouldSuccessfullyGetOrderFromRepository() throws OrderRepository.OrderRepositoryException, OrderService.OrderServiceException {
+        when(orderRepository.read(SOME_ORDER_ID)).thenReturn(order);
+        assertThat(orderService.getOrder(SOME_ORDER_ID)).isSameAs(order);
+        verify(orderRepository, times(1)).read(SOME_ORDER_ID);
+        verifyNoMoreInteractionsWithAnyMock();
+    }
+
+    @Test(expected = OrderService.OrderServiceException.class)
+    public void shouldThrowExceptionWhenCantSaveToOrderRepository() throws OrderRepository.OrderRepositoryException, OrderService.OrderServiceException {
+        when(orderRepository.write(order)).thenThrow(OrderRepository.OrderRepositoryException.class);
+        orderService.saveOrder(order);
+    }
+
+    @Test
+    public void shouldSuccessfullySaveOrder() throws OrderRepository.OrderRepositoryException, OrderService.OrderServiceException {
+        when(orderRepository.write(order)).thenReturn(order);
+        orderService.saveOrder(order);
+        verify(orderRepository, times(1)).write(order);
+        verifyNoMoreInteractionsWithAnyMock();
+    }
+
+    @Test(expected = OrderService.OrderServiceException.class)
+    public void shouldThrowExceptionWhenCantProcessOrder() throws OrderRepository.OrderRepositoryException, OrderService.OrderServiceException, OrderProcessor.OrderProcessorException {
+        doThrow(OrderProcessor.OrderProcessorException.class).when(orderProcessor).processOrder(order);
+        orderService.processOrders(order);
+    }
+
+    @Test
+    public void shouldSuccessfullyProcessAllOrders() throws OrderService.OrderServiceException, OrderProcessor.OrderProcessorException {
+        Order[] orders = new Order[]{Mockito.mock(Order.class), Mockito.mock(Order.class), Mockito.mock(Order.class)};
+        Arrays.stream(orders).forEach(o -> when(o.getId()).thenReturn(ThreadLocalRandom.current().nextLong()));
+
+        orderService.processOrders(orders);
+        for (Order order : orders) {
+            verify(orderProcessor, times(1)).processOrder(order);
+            verify(orderEventPublisher, times(1)).publishOrderProcessed(order.getId());
+        }
+        verifyNoMoreInteractionsWithAnyMock();
+    }
+
+    private void verifyNoMoreInteractionsWithAnyMock() {
+        Object[] mockedObjects = Arrays.stream(this.getClass().getDeclaredFields())
+                .filter(f -> f.isAnnotationPresent(Mock.class))
+                .map(f -> {
+                    try {
+                        return f.get(this);
+                    } catch (IllegalAccessException e) {
+                        throw new RuntimeException(e);
+                    }
+                }).toArray();
+        verifyNoMoreInteractions(mockedObjects);
     }
 }

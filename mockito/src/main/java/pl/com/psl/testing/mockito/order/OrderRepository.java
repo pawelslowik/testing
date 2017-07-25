@@ -8,7 +8,5 @@ public interface OrderRepository {
     Order write(Order order) throws OrderRepositoryException;
     Order read(long id) throws OrderRepositoryException;
 
-    class OrderRepositoryException extends Exception {
-
-    }
+    class OrderRepositoryException extends Exception {}
 }
