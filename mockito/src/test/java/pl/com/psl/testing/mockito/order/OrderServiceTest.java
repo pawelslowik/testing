@@ -3,9 +3,7 @@ package pl.com.psl.testing.mockito.order;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.Mockito;
+import org.mockito.*;
 import org.mockito.junit.MockitoJUnitRunner;
 import pl.com.psl.testing.mockito.customer.Customer;
 import pl.com.psl.testing.mockito.customer.CustomerService;
@@ -16,6 +14,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Matchers.argThat;
@@ -54,6 +53,10 @@ public class OrderServiceTest {
     private OrderProcessor orderProcessor;
     @InjectMocks
     private OrderService orderService;
+    @Captor
+    private ArgumentCaptor<Order> orderCaptor;
+    @Captor
+    private ArgumentCaptor<Long> idCaptor;
 
     @Before
     public void init() {
@@ -107,7 +110,7 @@ public class OrderServiceTest {
         when(customer.getAddress()).thenReturn(SOME_ADDRESS);
         when(customer.getName()).thenReturn(SOME_CUSTOMER_NAME);
         when(customerService.has(customer)).thenReturn(Boolean.TRUE);
-        orderService.createOrder(customer, Collections.EMPTY_LIST);
+        orderService.createOrder(customer, Collections.emptyList());
     }
 
     @Test(expected = OrderService.OrderServiceException.class)
@@ -209,12 +212,11 @@ public class OrderServiceTest {
     public void shouldSuccessfullyProcessAllOrders() throws OrderService.OrderServiceException, OrderProcessor.OrderProcessorException {
         Order[] orders = new Order[]{Mockito.mock(Order.class), Mockito.mock(Order.class), Mockito.mock(Order.class)};
         Arrays.stream(orders).forEach(o -> when(o.getId()).thenReturn(ThreadLocalRandom.current().nextLong()));
-
         orderService.processOrders(orders);
-        for (Order order : orders) {
-            verify(orderProcessor, times(1)).processOrder(order);
-            verify(orderEventPublisher, times(1)).publishOrderProcessed(order.getId());
-        }
+        verify(orderProcessor, times(orders.length)).processOrder(orderCaptor.capture());
+        verify(orderEventPublisher, times(orders.length)).publishOrderProcessed(idCaptor.capture());
+        assertThat(orderCaptor.getAllValues()).containsExactly(orders);
+        assertThat(idCaptor.getAllValues()).containsExactlyElementsOf(Arrays.stream(orders).map(Order::getId).collect(Collectors.toList()));
         verifyNoMoreInteractionsWithAnyMock();
     }
 
